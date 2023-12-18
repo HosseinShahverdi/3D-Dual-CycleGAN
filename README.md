@@ -38,8 +38,11 @@ Contributors names and contact info
 Ali Mahboubisarighieh
 mahboubi.ali1991@gmail.com
 ,
-Seyed Masoud Rezaeijo
-masoudrezayi1398@gmail.com
+Shabnam Jafarpoor
+shabnamjafarpoor1371@gmail.com
+,
+Hossein Shahverdi
+h.shahverdi1997@gmail.com
 
 ## Version History
 
