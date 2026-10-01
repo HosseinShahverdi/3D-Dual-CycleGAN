@@ -1,52 +1,108 @@
-# MedNifti_DuCycleGan
-Enhancing 3D Multi-Contrast MRI Synthesis with the 3D Dual-CycleGAN Model
-## Description
+# Dual-CycleGAN for cross-modality medical image translation (TensorFlow 1.x)
 
-GANs offer the ability to represent sharp and complex probability densities through a nonparametric approach . They have been widely adopted in medical image analysis, particularly for tasks like data augmentation and multi-modality image translations, due to their capability to handle domain shift . To address the issue of domain-specific deformations being encoded as domain-specific features and reproduced in the synthesized output, researchers have integrated CycleGAN into the training process. Previous studies have demonstrated that CycleGAN can be trained using unpaired brain data . However, these studies were more limited to training the network on a single slice and were two-dimensional in nature. Moreover, image synthesis was primarily performed within a single modality, such as synthesizing T1W from T2W or synthesizing T2W from FLAIR and vice versa. This study aims to synthesize 3D Multi-Contrast MRI using 3D Dual-CycleGAN.
-## Getting Started
+Code accompanying:
 
-### Dependencies
-* prerequisites, libraries, etc., needed before installing program.
-* tensorflow==1.14.0
-* imageio==2.22.4
-* matplotlib==3.5.3
-* nibabel==4.0.2
-* numpy==1.21.6
-* opencv_python==4.1.0.25
-* Pillow==9.3.0
-* scipy==1.7.3
-* SimpleITK==2.2.1
+> Mahboubisarighieh A., Shahverdi H., Jafarpoor Nesheli S., Alipoor Kermani M., Niknam M., Torkashvand M., Rezaeijo S. M.
+> *Assessing the efficacy of 3D Dual-CycleGAN for multi-contrast MRI synthesis.*
+> Egyptian Journal of Radiology and Nuclear Medicine 55, 2024. https://doi.org/10.1186/s43055-024-01287-y
 
-### Installing
+<!-- TODO (Hossein): confirm that this repository is the code of the paper above.
+     The code in this repo is slice-based (2D convolutions, 256x256x1 inputs) and its data
+     folders are named CT / PET. The paper describes 3D volumes on BraTS 2021.
+     Fix the title and this paragraph so they match what the code really does. -->
 
-* first of all you should install requirments with code below:
+## What this code does
+
+A paired/unpaired image-to-image translation model made of two generators (G: A -> B, F: B -> A)
+and two discriminators, trained with a dual cycle-consistency scheme. NIfTI volumes are converted
+to 2D slices, translated slice by slice, and re-assembled into NIfTI volumes.
+
+Generator loss terms (all switchable with flags in `main.py`):
+
+| Term | Flag | Default weight |
+|---|---|---|
+| Adversarial (cross-entropy or LSGAN) | `is_lsgan` | 1 |
+| Cycle-consistency (L1) | `cycle_consistent_weight` | 10 |
+| Voxel-wise L1 | `L1_lambda` | 100 |
+| Gradient difference loss | `gdl_weight` | 100 |
+| Perceptual loss (VGG16 features, layer 5) | `perceptual_weight`, `perceptual_mode` | 1 |
+| SSIM loss | `ssim_weight` | 0.05 |
+
+Learning modes (`learning_mode`): `super` (paired), `unsuper` (unpaired), `semi`. Seven discriminator
+variants (`dis_model` a to g). Optimization can be alternating or integrated (`is_alternative_optim`).
+
+## Repository layout
+
+| File | Purpose |
+|---|---|
+| `main.py` | Entry point and all command-line flags; runs training or inference |
+| `dc2anet.py` | Model: generators, discriminators and all loss functions |
+| `solver.py` | Training / test loop, checkpoints, sample images, logging |
+| `pre_util.py` | NIfTI <-> slice conversion (`nii_to_sample`, `creat_nii`, `add_header`) |
+| `build_data.py` | Writes the slice images into TFRecords |
+| `dataset.py`, `reader.py` | TFRecord dataset definition and reader |
+| `vgg16.py` | VGG16 used for the perceptual loss |
+| `tensorflow_utils.py`, `utils.py`, `display.py`, `extract_testPic.py` | Helpers |
+
+## Data layout
+
+Data is not included. Put paired NIfTI volumes with the same file name in:
+
 ```
-pip install -r requiremnets.txt
+DC2Anet_db/nifti_sample/CT/<patient>.nii.gz
+DC2Anet_db/nifti_sample/PET/<patient>.nii.gz
 ```
 
+`pre_util.nii_to_sample` rescales each volume to 0-255, writes every slice, and concatenates the
+two modalities side by side as one `.jpg` (256 x 256 per side). `build_data.py` then writes these
+into `DC2Anet_db/tfrecords/`.
 
-### Executing program
-for running the code you should use main.py file and run it.
+## Environment
+
 ```
-python main.py
+pip install -r requirements.txt
 ```
+
+TensorFlow 1.14.0 (Python 3.7 or older) with a CUDA 10.0 GPU. Newer Python / TensorFlow versions
+will not work without porting the code to TF2 / PyTorch.
+
+## Usage
+
+Training (set `--is_train=True`):
+
+```
+python main.py --is_train=True --gpu_index=0 --batch_size=1 --iters=200000 --learning_mode=super
+```
+
+Inference (default): put the volumes in `DC2Anet_db/nifti_sample/`, set `--load_model` to the
+checkpoint folder under `DC2Anet_db/model/`, then run
+
+```
+python main.py --gpu_index=0 --load_model=<checkpoint_folder>
+```
+
+Predicted volumes are written to `DC2Anet_db/test/<checkpoint_folder>/`.
+
+## Results
+
+<!-- TODO: add 2 or 3 example input / output / ground-truth images and the metrics table from the paper
+     (MAE, PSNR, SSIM, ...). Do not fill in numbers that are not from your own runs. -->
+
+## Known limitations
+
+- Paths are hard-coded, and `main.py` splits file paths on `\\`, so it only works on Windows as written.
+- Slice-by-slice processing: no 3D context is used by the network (all convolutions are 2D).
+- Depends on TensorFlow 1.14, which is no longer maintained.
+- No trained weights or test data are provided.
 
 ## Authors
 
-Contributors names and contact info
+Ali Mahboubisarighieh, Shabnam Jafarpoor, Hossein Shahverdi
 
-Ali Mahboubisarighieh
-mahboubi.ali1991@gmail.com
-,
-Shabnam Jafarpoor
-shabnamjafarpoor1371@gmail.com
-,
-Hossein Shahverdi
-h.shahverdi1997@gmail.com
+## License
 
-## Version History
+<!-- TODO: add a LICENSE file (MIT is common for research code) after agreeing with the co-authors. -->
 
-* 0.1
-    * Initial Release
+## Version history
 
-
+- 0.1: initial release
